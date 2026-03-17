@@ -1,8 +1,17 @@
 'use client'
 
-import { Search, Bell, MessageCircle, User, Upload } from 'lucide-react'
-import { useState } from 'react'
+import { Search, Bell, Upload, LogOut, User } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
 
 interface HeaderProps {
   onUploadClick?: () => void
@@ -10,6 +19,51 @@ interface HeaderProps {
 
 export function Header({ onUploadClick }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  const [user, setUser] = useState<SupabaseUser | null>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    const initAuth = async () => {
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      setUser(session?.user ?? null)
+
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null)
+      })
+
+      return () => subscription.unsubscribe()
+    }
+
+    initAuth()
+  }, [])
+
+  const handleUploadClick = () => {
+    if (!user) {
+      router.push('/login')
+      return
+    }
+    onUploadClick?.()
+  }
+
+  const handleLogout = async () => {
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/')
+    router.refresh()
+  }
+
+  const userInitial =
+    (user?.user_metadata?.username as string)?.[0]?.toUpperCase() ||
+    user?.email?.[0]?.toUpperCase() ||
+    '?'
 
   return (
     <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
@@ -38,7 +92,7 @@ export function Header({ onUploadClick }: HeaderProps) {
         {/* Right Icons */}
         <div className="flex items-center gap-2 shrink-0">
           <Button
-            onClick={onUploadClick}
+            onClick={handleUploadClick}
             variant="default"
             size="sm"
             className="rounded-full hidden sm:flex"
@@ -46,26 +100,52 @@ export function Header({ onUploadClick }: HeaderProps) {
             <Upload className="h-4 w-4 mr-1" />
             投稿
           </Button>
+
           <button
             className="p-3 rounded-full hover:bg-secondary transition-colors"
             aria-label="通知"
           >
             <Bell className="h-5 w-5 text-foreground" />
           </button>
-          <button
-            className="p-3 rounded-full hover:bg-secondary transition-colors"
-            aria-label="メッセージ"
-          >
-            <MessageCircle className="h-5 w-5 text-foreground" />
-          </button>
-          <button
-            className="p-3 rounded-full hover:bg-secondary transition-colors"
-            aria-label="プロフィール"
-          >
-            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-              <User className="h-4 w-4 text-primary-foreground" />
-            </div>
-          </button>
+
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="p-1 rounded-full hover:bg-secondary transition-colors" aria-label="アカウントメニュー">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user.user_metadata?.avatar_url as string | undefined} />
+                    <AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">
+                      {userInitial}
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
+                  onClick={() => {
+                    const username = user.user_metadata?.username || user.email?.split('@')[0]
+                    router.push(`/profile/${username}`)
+                  }}
+                >
+                  <User className="h-4 w-4 mr-2" />
+                  プロフィール
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  ログアウト
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={() => router.push('/login')}
+            >
+              ログイン
+            </Button>
+          )}
         </div>
       </div>
     </header>

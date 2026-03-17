@@ -30,7 +30,7 @@ const AI_SOFTWARE_NAMES = [
   'content-aware fill',
 ]
 
-export async function verifyC2PA(imageBuffer: Buffer): Promise<C2PAResult> {
+export async function verifyC2PA(imageBuffer: Buffer, mimeType = 'image/jpeg'): Promise<C2PAResult> {
   try {
     // c2pa-nodeを動的インポート（Node.js Runtimeのみ使用可能）
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -40,7 +40,7 @@ export async function verifyC2PA(imageBuffer: Buffer): Promise<C2PAResult> {
 
     let manifest
     try {
-      manifest = await c2pa.read({ buffer: imageBuffer, mimeType: 'image/jpeg' })
+      manifest = await c2pa.read({ buffer: imageBuffer, mimeType })
     } catch {
       // C2PAデータなし = 人間が作った可能性のある普通の画像
       return { status: 'no_data' }

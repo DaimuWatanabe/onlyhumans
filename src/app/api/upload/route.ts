@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient, Prisma } from '@prisma/client'
-import { createClient } from '@supabase/supabase-js'
+import { createClient as createSupabaseStorage } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
 import { verifyC2PA } from '@/lib/c2pa/verify'
 
 // Node.js Runtime を明示（c2pa-node はネイティブバインディングを使用）
@@ -8,6 +9,18 @@ export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
+    // セッション確認（ミドルウェアで保護済みだが二重チェック）
+    const supabase = await createClient()
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
+      return NextResponse.json({ error: '認証が必要です' }, { status: 401 })
+    }
+
+    const userId = session.user.id
+
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const title = formData.get('title') as string | null
@@ -39,8 +52,8 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer()
     const imageBuffer = Buffer.from(arrayBuffer)
 
-    // --- C2PA検証パイプライン ---
-    const c2paResult = await verifyC2PA(imageBuffer)
+    // --- C2PA検証パイプライン（mimeTypeを正しく渡す）---
+    const c2paResult = await verifyC2PA(imageBuffer, file.type)
 
     // AI生成コンテンツは拒否
     if (c2paResult.status === 'rejected_ai') {
@@ -54,16 +67,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Supabase Storage への保存（Supabase設定済みの場合のみ）
+    // Supabase Storage への保存
     let imageUrl = ''
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     if (supabaseUrl && supabaseKey) {
-      const supabase = createClient(supabaseUrl, supabaseKey)
+      const storageClient = createSupabaseStorage(supabaseUrl, supabaseKey)
 
-      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${file.type.split('/')[1]}`
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const ext = file.type.split('/')[1]
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const { data: uploadData, error: uploadError } = await storageClient.storage
         .from('pins')
         .upload(fileName, imageBuffer, {
           contentType: file.type,
@@ -74,7 +88,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'ファイルの保存に失敗しました' }, { status: 500 })
       }
 
-      const { data: urlData } = supabase.storage
+      const { data: urlData } = storageClient.storage
         .from('pins')
         .getPublicUrl(uploadData.path)
 
@@ -85,17 +99,27 @@ export async function POST(request: NextRequest) {
     }
 
     // --- DB登録（Prisma使用）---
-    // Supabase設定済みの場合のみ実際にDBに保存
     let pinId = `demo-${Date.now()}`
 
     if (process.env.DATABASE_URL) {
       const prisma = new PrismaClient()
 
       try {
+        // ユーザーが存在することを保証（Supabase AuthとPrismaの連携）
+        await prisma.user.upsert({
+          where: { id: userId },
+          create: {
+            id: userId,
+            email: session.user.email!,
+            username: session.user.user_metadata?.username || session.user.email!.split('@')[0],
+            displayName: session.user.user_metadata?.username || null,
+          },
+          update: {},
+        })
+
         const pin = await prisma.pin.create({
           data: {
-            // デモ用固定ユーザーID（実装時はセッションから取得）
-            userId: 'demo-user',
+            userId,
             title: title.trim(),
             description: description?.trim() || null,
             imageUrl,

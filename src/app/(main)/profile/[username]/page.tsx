@@ -1,43 +1,60 @@
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
+import { C2PABadge } from '@/components/pin/C2PABadge'
+import { C2PAStatus } from '@/types/c2pa'
 
 interface ProfilePageProps {
   params: Promise<{ username: string }>
 }
 
+interface ProfilePin {
+  id: string
+  title: string
+  image: string
+  c2paStatus: string
+}
+
+interface ProfileData {
+  username: string
+  displayName: string | null
+  bio: string | null
+  avatarUrl: string | null
+  pinCount: number
+  pins: ProfilePin[]
+}
+
+async function getProfile(username: string): Promise<ProfileData | null> {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
+  if (!process.env.DATABASE_URL) {
+    // デモフォールバック
+    return {
+      username,
+      displayName: username.charAt(0).toUpperCase() + username.slice(1),
+      bio: 'アーティスト・フォトグラファー',
+      avatarUrl: null,
+      pinCount: 0,
+      pins: [],
+    }
+  }
+
+  const res = await fetch(`${baseUrl}/api/users/${username}`, { cache: 'no-store' })
+  if (res.status === 404) return null
+  if (!res.ok) return null
+
+  return res.json()
+}
+
 export default async function ProfilePage({ params }: ProfilePageProps) {
   const { username } = await params
+  const profile = await getProfile(username)
 
-  if (!username) {
+  if (!profile) {
     notFound()
   }
 
-  // デモ用プロフィールデータ
-  const profile = {
-    username,
-    displayName: username.charAt(0).toUpperCase() + username.slice(1),
-    bio: 'アーティスト・フォトグラファー',
-    avatarUrl: null,
-    pinCount: 12,
-  }
-
-  const demoPins = [
-    {
-      id: 'p1',
-      image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=600&fit=crop',
-      title: 'Mountain Sunrise',
-    },
-    {
-      id: 'p2',
-      image: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400&h=400&fit=crop',
-      title: 'Ocean Dreams',
-    },
-    {
-      id: 'p3',
-      image: 'https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?w=400&h=620&fit=crop',
-      title: 'Forest Light',
-    },
-  ]
+  const displayName = profile.displayName || username
 
   return (
     <div className="min-h-screen bg-background">
@@ -48,7 +65,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
             {profile.avatarUrl ? (
               <Image
                 src={profile.avatarUrl}
-                alt={profile.displayName}
+                alt={displayName}
                 width={96}
                 height={96}
                 className="rounded-full object-cover"
@@ -56,31 +73,40 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
               />
             ) : (
               <span className="text-3xl font-semibold text-muted-foreground">
-                {profile.displayName.charAt(0)}
+                {displayName.charAt(0).toUpperCase()}
               </span>
             )}
           </div>
-          <h1 className="text-2xl font-semibold">{profile.displayName}</h1>
+          <h1 className="text-2xl font-semibold">{displayName}</h1>
           <p className="text-muted-foreground">@{profile.username}</p>
           {profile.bio && <p className="text-sm mt-2">{profile.bio}</p>}
           <p className="text-sm text-muted-foreground mt-2">{profile.pinCount} 投稿</p>
         </div>
 
         {/* Pins Grid */}
-        <div className="columns-2 sm:columns-3 md:columns-4 gap-4">
-          {demoPins.map((pin) => (
-            <div key={pin.id} className="break-inside-avoid mb-4 rounded-2xl overflow-hidden">
-              <Image
-                src={pin.image}
-                alt={pin.title}
-                width={400}
-                height={600}
-                className="w-full h-auto object-cover"
-                unoptimized
-              />
-            </div>
-          ))}
-        </div>
+        {profile.pins.length === 0 ? (
+          <p className="text-center text-muted-foreground py-12">まだ投稿がありません</p>
+        ) : (
+          <div className="columns-2 sm:columns-3 md:columns-4 gap-4">
+            {profile.pins.map((pin) => (
+              <Link key={pin.id} href={`/pin/${pin.id}`} className="block break-inside-avoid mb-4">
+                <div className="relative rounded-2xl overflow-hidden group">
+                  <Image
+                    src={pin.image}
+                    alt={pin.title}
+                    width={400}
+                    height={600}
+                    className="w-full h-auto object-cover"
+                    unoptimized
+                  />
+                  <div className="absolute top-2 left-2">
+                    <C2PABadge status={pin.c2paStatus as C2PAStatus} size="sm" />
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -31,7 +31,7 @@ export default function SignupPage() {
       const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
 
-      const { error: authError } = await supabase.auth.signUp({
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -42,6 +42,20 @@ export default function SignupPage() {
       if (authError) {
         setError(authError.message)
         return
+      }
+
+      // Prisma users テーブルにレコードを作成
+      if (authData.user) {
+        await fetch('/api/auth/create-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: authData.user.id,
+            email,
+            username,
+            displayName: username,
+          }),
+        })
       }
 
       setSuccess(true)
