@@ -3,6 +3,7 @@ import { PrismaClient, Prisma } from '@prisma/client'
 import { createClient as createSupabaseStorage } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { verifyC2PA } from '@/lib/c2pa/verify'
+import { createImage } from '@/app/actions/images'
 
 // Node.js Runtime を明示（c2pa-node はネイティブバインディングを使用）
 export const runtime = 'nodejs'
@@ -141,6 +142,30 @@ export async function POST(request: NextRequest) {
       } finally {
         await prisma.$disconnect()
       }
+    }
+
+    // --- imagesテーブルへの二重書き込み（失敗してもアップロード全体は続行）---
+    try {
+      await createImage({
+        userId,
+        title: title.trim(),
+        description: description?.trim(),
+        imageUrl,
+        mimeType: file.type,
+        fileSize: file.size,
+        c2paStatus: c2paResult.status,
+        legacyPinId: pinId !== `demo-${Date.now()}` ? pinId : undefined,
+        ...(c2paResult.status === 'verified_human' && {
+          manifestJson: c2paResult.manifestJson as Record<string, unknown>,
+          signerInfo: (c2paResult.signerInfo ?? {}) as Record<string, unknown>,
+          deviceInfo: (c2paResult.deviceInfo ?? {}) as Record<string, unknown>,
+          softwareInfo: (c2paResult.softwareInfo ?? {}) as Record<string, unknown>,
+          isAiFlagged: false,
+        }),
+      })
+    } catch {
+      // imagesテーブルへの書き込み失敗はアップロード全体を失敗にしない
+      console.warn('imagesテーブルへの書き込みに失敗しました（処理は続行します）')
     }
 
     return NextResponse.json({
