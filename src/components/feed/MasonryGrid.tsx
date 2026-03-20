@@ -6,9 +6,10 @@ import { PinCardData } from '@/types/pin'
 
 interface MasonryGridProps {
   pins: PinCardData[]
+  currentUserId?: string | null
 }
 
-export function MasonryGrid({ pins }: MasonryGridProps) {
+export function MasonryGrid({ pins, currentUserId }: MasonryGridProps) {
   if (pins.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
@@ -40,6 +41,7 @@ export function MasonryGrid({ pins }: MasonryGridProps) {
           c2paStatus={pin.c2paStatus}
           author={pin.author}
           index={index}
+          currentUserId={currentUserId}
         />
       ))}
     </motion.div>

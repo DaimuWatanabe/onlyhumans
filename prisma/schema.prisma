@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.0.x"]
 }
 
 datasource db {
@@ -8,39 +9,37 @@ datasource db {
 }
 
 model User {
-  id                  String   @id @default(cuid())
-  email               String   @unique
-  username            String   @unique
-  displayName         String?  @map("display_name")
-  avatarUrl           String?  @map("avatar_url")
-  bio                 String?
-  verificationStatus  String   @default("unverified") @map("verification_status")
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
-
-  pins        Pin[]
-  collections Collection[]
-  savedPins   SavedPin[]
+  id                 String       @id @default(cuid())
+  email              String       @unique
+  username           String       @unique
+  displayName        String?      @map("display_name")
+  avatarUrl          String?      @map("avatar_url")
+  bio                String?
+  verificationStatus String       @default("unverified") @map("verification_status")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+  collections        Collection[]
+  pins               Pin[]
+  savedPins          SavedPin[]
 
   @@map("users")
 }
 
 model Pin {
-  id             String   @id @default(cuid())
-  userId         String   @map("user_id")
-  title          String
-  description    String?
-  imageUrl       String   @map("image_url")
-  width          Int?
-  height         Int?
-  c2paStatus     String   @default("pending") @map("c2pa_status")
-  provenanceDataId String? @map("provenance_data_id")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  provenanceData ProvenanceData?
-  savedPins      SavedPin[]
+  id               String          @id @default(cuid())
+  userId           String          @map("user_id")
+  title            String
+  description      String?
+  imageUrl         String          @map("image_url")
+  width            Int?
+  height           Int?
+  c2paStatus       String          @default("pending") @map("c2pa_status")
+  provenanceDataId String?         @map("provenance_data_id")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provenanceData   ProvenanceData?
+  savedPins        SavedPin[]
 
   @@map("pins")
 }
@@ -54,38 +53,35 @@ model ProvenanceData {
   softwareInfo Json?    @map("software_info")
   isAiFlagged  Boolean  @default(false) @map("is_ai_flagged")
   verifiedAt   DateTime @default(now()) @map("verified_at")
-
-  pin Pin @relation(fields: [pinId], references: [id], onDelete: Cascade)
+  pin          Pin      @relation(fields: [pinId], references: [id], onDelete: Cascade)
 
   @@map("provenance_data")
 }
 
 model Collection {
-  id            String   @id @default(cuid())
-  userId        String   @map("user_id")
+  id            String     @id @default(cuid())
+  userId        String     @map("user_id")
   name          String
   description   String?
-  coverImageUrl String?  @map("cover_image_url")
-  isPrivate     Boolean  @default(false) @map("is_private")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  savedPins SavedPin[]
+  coverImageUrl String?    @map("cover_image_url")
+  isPrivate     Boolean    @default(false) @map("is_private")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  savedPins     SavedPin[]
 
   @@map("collections")
 }
 
 model SavedPin {
-  id           String   @id @default(cuid())
-  userId       String   @map("user_id")
-  pinId        String   @map("pin_id")
-  collectionId String?  @map("collection_id")
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  pin        Pin         @relation(fields: [pinId], references: [id], onDelete: Cascade)
-  collection Collection? @relation(fields: [collectionId], references: [id])
+  id           String      @id @default(cuid())
+  userId       String      @map("user_id")
+  pinId        String      @map("pin_id")
+  collectionId String?     @map("collection_id")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  collection   Collection? @relation(fields: [collectionId], references: [id])
+  pin          Pin         @relation(fields: [pinId], references: [id], onDelete: Cascade)
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, pinId])
   @@map("saved_pins")

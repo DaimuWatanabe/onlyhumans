@@ -10,17 +10,18 @@ export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
-    // セッション確認（ミドルウェアで保護済みだが二重チェック）
+    // ユーザー確認（ミドルウェアで保護済みだが二重チェック）
     const supabase = await createClient()
     const {
-      data: { session },
-    } = await supabase.auth.getSession()
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
-    if (!session) {
+    if (authError || !user) {
       return NextResponse.json({ error: '認証が必要です' }, { status: 401 })
     }
 
-    const userId = session.user.id
+    const userId = user.id
 
     const formData = await request.formData()
     const file = formData.get('file') as File | null
@@ -111,9 +112,9 @@ export async function POST(request: NextRequest) {
           where: { id: userId },
           create: {
             id: userId,
-            email: session.user.email!,
-            username: session.user.user_metadata?.username || session.user.email!.split('@')[0],
-            displayName: session.user.user_metadata?.username || null,
+            email: user.email!,
+            username: user.user_metadata?.username || user.email!.split('@')[0],
+            displayName: user.user_metadata?.username || null,
           },
           update: {},
         })

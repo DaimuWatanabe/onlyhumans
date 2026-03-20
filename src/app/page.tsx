@@ -8,6 +8,7 @@ import { SkeletonGrid } from '@/components/feed/SkeletonCard'
 import { UploadModal } from '@/components/upload/UploadModal'
 import { useFeedStore } from '@/stores/feedStore'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
+import { createClient } from '@/lib/supabase/client'
 import { Loader2 } from 'lucide-react'
 
 const CATEGORIES = [
@@ -23,6 +24,14 @@ const CATEGORIES = [
 export default function Home() {
   const { pins, isLoading, hasMore, activeCategory, setActiveCategory, fetchPins } = useFeedStore()
   const [isUploadOpen, setIsUploadOpen] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setCurrentUserId(user?.id ?? null)
+    })
+  }, [])
 
   useEffect(() => {
     if (pins.length === 0) {
@@ -57,7 +66,7 @@ export default function Home() {
           <SkeletonGrid />
         ) : (
           <>
-            <MasonryGrid pins={pins} />
+            <MasonryGrid pins={pins} currentUserId={currentUserId} />
 
             {/* Load More Sentinel */}
             <div ref={sentinelRef} className="h-4" />

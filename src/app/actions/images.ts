@@ -50,6 +50,7 @@ export async function getImages(params?: {
   cursor?: string
   limit?: number
   c2paStatus?: string
+  userId?: string
 }): Promise<ActionResult<PaginatedResult<ImageCard>>> {
   const supabase = await createClient()
   const limit = params?.limit ?? 20
@@ -75,6 +76,10 @@ export async function getImages(params?: {
 
   if (params?.c2paStatus) {
     query = query.eq('c2pa_status', params.c2paStatus)
+  }
+
+  if (params?.userId) {
+    query = query.eq('user_id', params.userId)
   }
 
   if (params?.cursor) {
